@@ -1,0 +1,549 @@
+// Copyright (c) 2003-2022 Rionix, Ltd. All Rights Reserved.
+
+#include "Components/SimpleVisualizerComponent.h"
+
+//
+// Internal functions
+//
+
+namespace
+{
+    // Engine source 4.27
+    // .\Engine\Source\Runtime\Engine\Private\PrimitiveDrawingUtils.cpp
+    // Lines [1134-1152]: DrawWireChoppedCone
+    void DrawWireCone_Internal(FPrimitiveDrawInterface* PDI, const FVector& Base,
+        const FVector& X, const FVector& Y, const FVector& Z,
+        const FLinearColor& Color, float Radius, float TopRadius, float HalfHeight,
+        int32 NumSides, uint8 DepthPriority, float Thickness)
+    {
+        const float AngleDelta = 2.0f * PI / NumSides;
+        FVector LastVertex = Base + X * Radius;
+        FVector LastTopVertex = Base + X * TopRadius;
+
+        for (int32 SideIndex = 0; SideIndex < NumSides; SideIndex++)
+        {
+            const FVector Vertex = Base + (X * FMath::Cos(AngleDelta * (SideIndex + 1)) + Y * FMath::Sin(AngleDelta * (SideIndex + 1))) * Radius;
+            const FVector TopVertex = Base + (X * FMath::Cos(AngleDelta * (SideIndex + 1)) + Y * FMath::Sin(AngleDelta * (SideIndex + 1))) * TopRadius;
+
+            PDI->DrawLine(LastVertex - Z * HalfHeight, Vertex - Z * HalfHeight, Color, DepthPriority, Thickness);
+            PDI->DrawLine(LastTopVertex + Z * HalfHeight, TopVertex + Z * HalfHeight, Color, DepthPriority, Thickness);
+            PDI->DrawLine(LastVertex - Z * HalfHeight, LastTopVertex + Z * HalfHeight, Color, DepthPriority, Thickness);
+
+            LastVertex = Vertex;
+            LastTopVertex = TopVertex;
+        }
+    }
+
+    // Engine source 4.27
+    // .\Engine\Source\Runtime\Engine\Private\PrimitiveDrawingUtils.cpp
+    // Lines [549-650]: BuildCylinderVerts
+    void BuildConeVerts_Internal(const FVector& Base, 
+        const FVector& XAxis, const FVector& YAxis, const FVector& ZAxis, 
+        float Radius, float HalfHeight, uint32 Sides, 
+        TArray<FDynamicMeshVertex>& OutVerts, TArray<uint32>& OutIndices)
+    {
+        const float AngleDelta = 2.0f * PI / Sides;
+        FVector LastVertex = Base + XAxis * Radius;
+
+        FVector2D TC = FVector2D(0.0f, 0.0f);
+        float TCStep = 1.0f / Sides;
+
+        FVector TopOffset = HalfHeight * ZAxis;
+
+        int32 BaseVertIndex = OutVerts.Num();
+
+        //Compute vertices for base circle.
+        for (uint32 SideIndex = 0; SideIndex < Sides; SideIndex++)
+        {
+            const FVector Vertex = Base + (XAxis * FMath::Cos(AngleDelta * (SideIndex + 1)) + YAxis * FMath::Sin(AngleDelta * (SideIndex + 1))) * Radius;
+            FVector Normal = Vertex - Base;
+            Normal.Normalize();
+
+            FDynamicMeshVertex MeshVertex;
+
+            MeshVertex.Position = Vertex - TopOffset;
+            MeshVertex.TextureCoordinate[0] = TC;
+
+            MeshVertex.SetTangents(
+                -ZAxis,
+                (-ZAxis) ^ Normal,
+                Normal
+            );
+
+            OutVerts.Add(MeshVertex); //Add bottom vertex
+
+            LastVertex = Vertex;
+            TC.X += TCStep;
+        }
+
+        LastVertex = Base + XAxis * Radius;
+        TC = FVector2D(0.0f, 1.0f);
+
+        //Compute vertices for the top circle
+        for (uint32 SideIndex = 0; SideIndex < Sides; SideIndex++)
+        {
+            const FVector Vertex = Base + (XAxis * FMath::Cos(AngleDelta * (SideIndex + 1)) + YAxis * FMath::Sin(AngleDelta * (SideIndex + 1))) * SMALL_NUMBER;
+            FVector Normal = Vertex - Base;
+            Normal.Normalize();
+
+            FDynamicMeshVertex MeshVertex;
+
+            MeshVertex.Position = Vertex + TopOffset;
+            MeshVertex.TextureCoordinate[0] = TC;
+
+            MeshVertex.SetTangents(
+                -ZAxis,
+                (-ZAxis) ^ Normal,
+                Normal
+            );
+
+            OutVerts.Add(MeshVertex); //Add top vertex
+
+            LastVertex = Vertex;
+            TC.X += TCStep;
+        }
+
+        //Add top/bottom triangles, in the style of a fan.
+        //Note if we wanted nice rendering of the caps then we need to duplicate the vertices and modify
+        //texture/tangent coordinates.
+        for (uint32 SideIndex = 1; SideIndex < Sides; SideIndex++)
+        {
+            int32 V0 = BaseVertIndex;
+            int32 V1 = BaseVertIndex + SideIndex;
+            int32 V2 = BaseVertIndex + ((SideIndex + 1) % Sides);
+
+            //bottom
+            OutIndices.Add(V0);
+            OutIndices.Add(V1);
+            OutIndices.Add(V2);
+
+            // top
+            // OutIndices.Add(Sides + V2);
+            // OutIndices.Add(Sides + V1);
+            // OutIndices.Add(Sides + V0);
+        }
+
+        //Add sides.
+
+        for (uint32 SideIndex = 0; SideIndex < Sides; SideIndex++)
+        {
+            int32 V0 = BaseVertIndex + SideIndex;
+            int32 V1 = BaseVertIndex + ((SideIndex + 1) % Sides);
+            int32 V2 = V0 + Sides;
+            int32 V3 = V1 + Sides;
+
+            OutIndices.Add(V0);
+            OutIndices.Add(V2);
+            OutIndices.Add(V1);
+
+            OutIndices.Add(V2);
+            OutIndices.Add(V3);
+            OutIndices.Add(V1);
+        }
+
+    }
+
+    // Engine source 4.27
+    // .\Engine\Source\Runtime\Engine\Private\PrimitiveDrawingUtils.cpp
+    // Lines [688-697]: GetConeMesh
+    void GetConeMesh_Internal(const FMatrix& LocalToWorld, const FVector& Base, 
+        const FVector& XAxis, const FVector& YAxis, const FVector& ZAxis, 
+        float Radius, float HalfHeight, uint32 Sides, 
+        const FMaterialRenderProxy* MaterialRenderProxy, uint8 DepthPriority, 
+        int32 ViewIndex, FMeshElementCollector& Collector)
+    {
+        TArray<FDynamicMeshVertex> MeshVerts;
+        TArray<uint32> MeshIndices;
+        BuildConeVerts_Internal(Base, XAxis, YAxis, ZAxis, Radius, HalfHeight, Sides, MeshVerts, MeshIndices);
+        FDynamicMeshBuilder MeshBuilder(Collector.GetFeatureLevel());
+        MeshBuilder.AddVertices(MeshVerts);
+        MeshBuilder.AddTriangles(MeshIndices);
+        MeshBuilder.GetMesh(LocalToWorld, MaterialRenderProxy, DepthPriority, false, false, ViewIndex, Collector);
+    }
+
+    // Engine source 4.27
+    // .\Engine\Source\Runtime\Engine\Private\PrimitiveDrawingUtils.cpp
+    // Lines [699-710]: GetCapsuleMesh
+    void GetCapsuleMesh_Internal(const FMatrix& LocalToWorld, const FLinearColor& Color, float Radius, float HalfHeight, int32 NumSides, const FMaterialRenderProxy* MaterialRenderProxy, uint8 DepthPriority, bool bDisableBackfaceCulling, int32 ViewIndex, FMeshElementCollector& Collector)
+    {
+        const FVector XAxis = LocalToWorld.GetScaledAxis(EAxis::X);
+        const FVector YAxis = LocalToWorld.GetScaledAxis(EAxis::Y);
+        const FVector ZAxis = LocalToWorld.GetScaledAxis(EAxis::Z);
+        const FVector Origin = LocalToWorld.GetOrigin() - ZAxis * HalfHeight;
+        const FVector ScaledRadius = LocalToWorld.GetScaleVector() * Radius;
+        const float HalfAxis = FMath::Max<float>(HalfHeight - Radius, 1.f);
+        const FVector BottomEnd = Origin + Radius * ZAxis;
+        const FVector TopEnd = BottomEnd + (2 * HalfAxis) * ZAxis;
+        const float CylinderHalfHeight = (TopEnd - BottomEnd).Size() * 0.5;
+        const FVector CylinderLocation = BottomEnd + CylinderHalfHeight * ZAxis;
+
+        GetOrientedHalfSphereMesh(TopEnd, FRotationMatrix::MakeFromXY(XAxis, YAxis).Rotator(), ScaledRadius, NumSides, NumSides, 0, PI / 2, MaterialRenderProxy, DepthPriority, bDisableBackfaceCulling, ViewIndex, Collector);
+        GetCylinderMesh(CylinderLocation, XAxis, YAxis, ZAxis, Radius, CylinderHalfHeight, NumSides, MaterialRenderProxy, DepthPriority, ViewIndex, Collector);
+        GetOrientedHalfSphereMesh(BottomEnd, FRotationMatrix::MakeFromXY(XAxis, YAxis).Rotator(), ScaledRadius, NumSides, NumSides, PI / 2, PI, MaterialRenderProxy, DepthPriority, bDisableBackfaceCulling, ViewIndex, Collector);
+    }
+}
+
+//
+// FSimpleVisualizerSceneProxy
+//
+
+class FSimpleVisualizerSceneProxy : public FPrimitiveSceneProxy
+{
+public:
+
+    FSimpleVisualizerSceneProxy(const USimpleVisualizerComponent* InComponent)
+        : FPrimitiveSceneProxy(InComponent)
+        , Shape(InComponent->Shape)
+        , Radii(InComponent->Radii)
+        , Height(InComponent->Height)
+        , Extent(InComponent->Extent)
+        , Points(InComponent->Points)
+        , BaseColor(InComponent->Color)
+        , Wireframe(SafeWireframe(InComponent->Shape, InComponent->Wireframe))
+        , LineThickness(InComponent->LineThickness)
+        , NumSides(InComponent->NumSides)
+        , ShowOnlyWhenSelected(InComponent->ShowOnlyWhenSelected)
+    {
+        bWantsSelectionOutline = InComponent->WantsSelectionOutline;
+    }
+
+    virtual SIZE_T GetTypeHash() const override
+    {
+        static size_t UniquePointer;
+        return reinterpret_cast<size_t>(&UniquePointer);
+    }
+
+    virtual void GetDynamicMeshElements(const TArray<const FSceneView*>& Views, 
+        const FSceneViewFamily& ViewFamily, uint32 VisibilityMap, 
+        FMeshElementCollector& Collector) const override
+    {
+        const FMatrix& LTW = GetLocalToWorld();
+        const FVector WorldOrigin = LTW.GetOrigin();
+        const float HalfHeight = Height / 2.f;
+
+        for (int32 ViewIndex = 0; ViewIndex < Views.Num(); ViewIndex++)
+        {
+            if (!(VisibilityMap & (1 << ViewIndex)))
+                continue;
+
+            FPrimitiveDrawInterface* PDI = Wireframe ? Collector.GetPDI(ViewIndex) : nullptr;
+
+            const bool Outline = Wireframe && WantsSelectionOutline();
+            const FLinearColor Color = GetViewSelectionColor(BaseColor, *Views[ViewIndex], 
+                Outline ? IsSelected() : false, Outline ? IsHovered() : false, 
+                false, IsIndividuallySelected());
+            const FMaterialRenderProxy* const ParentMaterial = Wireframe ? nullptr
+                : GEngine->DebugMeshMaterial->GetRenderProxy();
+            const FMaterialRenderProxy* const MeshMaterial = ParentMaterial
+                ? new(FMemStack::Get()) FColoredMaterialRenderProxy(ParentMaterial, Color)
+                : nullptr;
+
+            switch (Shape)
+            {
+            case ESimpleVisualizerShape::Sphere:
+                if (Wireframe)
+                    DrawWireSphere(PDI, FTransform{ LTW },
+                        Color, Radii, NumSides,
+                        SDPG_World, LineThickness);
+                else
+                    GetOrientedHalfSphereMesh(WorldOrigin, 
+                        LTW.Rotator(), LTW.GetScaleVector() * Radii,
+                        NumSides, FMath::Max(3, NumSides / 2), 0.f, PI,
+                        MeshMaterial, SDPG_World, false, ViewIndex, Collector);
+                break;
+
+            case ESimpleVisualizerShape::HalfSphere:
+                GetOrientedHalfSphereMesh(WorldOrigin, 
+                    LTW.Rotator(), LTW.GetScaleVector() * Radii,
+                    NumSides, NumSides, 0.f, HALF_PI,
+                    MeshMaterial, SDPG_World, false, ViewIndex, Collector);
+                break;
+
+            case ESimpleVisualizerShape::Box:
+                if (Wireframe)
+                    DrawOrientedWireBox(PDI, WorldOrigin,
+                        LTW.GetScaledAxis(EAxis::X),
+                        LTW.GetScaledAxis(EAxis::Y),
+                        LTW.GetScaledAxis(EAxis::Z),
+                        Extent, Color, SDPG_World, LineThickness);
+                else
+                    GetBoxMesh(LTW, Extent, 
+                        MeshMaterial, SDPG_World, ViewIndex, Collector);
+                break;
+
+            case ESimpleVisualizerShape::Cylinder:
+                if (Wireframe)
+                {
+                    if (Height > 0.f)
+                        DrawWireCylinder(PDI, WorldOrigin,
+                            LTW.GetScaledAxis(EAxis::X),
+                            LTW.GetScaledAxis(EAxis::Y),
+                            LTW.GetScaledAxis(EAxis::Z),
+                            Color, Radii, HalfHeight, NumSides,
+                            SDPG_World, LineThickness);
+                    else
+                        DrawCircle(PDI, WorldOrigin,
+                            LTW.GetScaledAxis(EAxis::X),
+                            LTW.GetScaledAxis(EAxis::Y),
+                            Color, Radii, NumSides,
+                            SDPG_World, LineThickness);
+                }
+                else
+                    GetCylinderMesh(LTW, FVector::ZeroVector, 
+                        LTW.GetScaledAxis(EAxis::X),
+                        LTW.GetScaledAxis(EAxis::Y),
+                        LTW.GetScaledAxis(EAxis::Z),
+                        Radii, HalfHeight, NumSides,
+                        MeshMaterial, SDPG_World, ViewIndex, Collector);
+                break;
+
+            case ESimpleVisualizerShape::Cone:
+                if (Wireframe)
+                    DrawWireCone_Internal(PDI, WorldOrigin,
+                        LTW.GetScaledAxis(EAxis::X),
+                        LTW.GetScaledAxis(EAxis::Y),
+                        LTW.GetScaledAxis(EAxis::Z),
+                        Color, Radii, 0.f, HalfHeight, NumSides,
+                        SDPG_World, LineThickness);
+                else
+                    GetConeMesh_Internal(LTW, FVector::ZeroVector,
+                        LTW.GetScaledAxis(EAxis::X),
+                        LTW.GetScaledAxis(EAxis::Y),
+                        LTW.GetScaledAxis(EAxis::Z),
+                        Radii, HalfHeight, NumSides,
+                        MeshMaterial, SDPG_World, ViewIndex, Collector);
+                break;
+
+            case ESimpleVisualizerShape::Capsule:
+                if (Wireframe)
+                    DrawWireCapsule(PDI, WorldOrigin,
+                        LTW.GetScaledAxis(EAxis::X),
+                        LTW.GetScaledAxis(EAxis::Y),
+                        LTW.GetScaledAxis(EAxis::Z),
+                        Color, Radii, HalfHeight, NumSides,
+                        SDPG_World, LineThickness);
+                else
+                    GetCapsuleMesh_Internal(LTW,
+                        FLinearColor{ Color }, Radii, HalfHeight, NumSides,
+                        MeshMaterial, SDPG_World, false, ViewIndex, Collector);
+                break;
+
+            case ESimpleVisualizerShape::Points:
+                for (const FVector& Pt : Points)
+                {
+                    if (Wireframe)
+                        DrawWireDiamond(PDI, 
+                            FTranslationMatrix{ LTW.TransformPosition(Pt) }, Radii,
+                            Color, SDPG_World, LineThickness);
+                    else
+                        GetSphereMesh(LTW.TransformPosition(Pt), FVector{ Radii }, 
+                            NumSides, NumSides,
+                            MeshMaterial, SDPG_World, false, ViewIndex, Collector);
+                }
+                break;
+
+            case ESimpleVisualizerShape::Polyline:
+                for (int32 i = 0; i < Points.Num() - 1; ++i)
+                {
+                    PDI->DrawLine(
+                        LTW.TransformPosition(Points[i]),
+                        LTW.TransformPosition(Points[i + 1]),
+                        Color, SDPG_World, LineThickness);
+                }
+                break;
+            } // switch (Shape)
+        }
+    }
+
+    virtual FPrimitiveViewRelevance GetViewRelevance(const FSceneView* View) const override
+    {
+        FPrimitiveViewRelevance Result;
+        Result.bDrawRelevance = IsShown(View) && (!ShowOnlyWhenSelected || IsSelected());
+        Result.bDynamicRelevance = true;
+        Result.bShadowRelevance = IsShadowCast(View);
+        Result.bEditorPrimitiveRelevance = UseEditorCompositing(View);
+        Result.bSeparateTranslucency = Result.bNormalTranslucency = IsShown(View);
+        return Result;
+    }
+
+    virtual uint32 GetMemoryFootprint(void) const override
+    {
+        return sizeof(*this) + GetAllocatedSize() + Points.GetAllocatedSize();
+    }
+
+private:
+
+    FORCEINLINE static bool SafeWireframe(ESimpleVisualizerShape Shape, bool Wireframe)
+    {
+        switch (Shape)
+        {
+        case ESimpleVisualizerShape::HalfSphere: 
+            return false;
+        case ESimpleVisualizerShape::Polyline:
+            return true;
+        }
+        return Wireframe;
+    }
+
+private:
+
+    // Shape
+    ESimpleVisualizerShape Shape;
+    float Radii;
+    float Height;
+    FVector Extent;
+    TArray<FVector> Points;
+    // Appearance
+    FColor BaseColor;
+    bool Wireframe;
+    float LineThickness;
+    int32 NumSides;
+    bool ShowOnlyWhenSelected;
+};
+
+//
+// USimpleVisualizerComponent
+//
+
+USimpleVisualizerComponent::USimpleVisualizerComponent(const FObjectInitializer& ObjectInitializer)
+    : Super(ObjectInitializer)
+{
+    // Tick
+    PrimaryComponentTick.bCanEverTick = false;
+    PrimaryComponentTick.bStartWithTickEnabled = false;
+
+    // Collision & Navigation
+    SetCollisionProfileName(UCollisionProfile::NoCollision_ProfileName);
+    SetGenerateOverlapEvents(false);
+    CanCharacterStepUpOn = ECB_No;
+    SetCanEverAffectNavigation(false);
+
+    // Rendering
+    SetHiddenInGame(true);
+    SetCastShadow(false);
+    SetReceivesDecals(false);
+}
+
+FPrimitiveSceneProxy* USimpleVisualizerComponent::CreateSceneProxy()
+{
+    return new FSimpleVisualizerSceneProxy(this);
+}
+
+FBoxSphereBounds USimpleVisualizerComponent::CalcBounds(const FTransform& LocalToWorld) const
+{
+    switch (Shape)
+    {
+    case ESimpleVisualizerShape::Sphere:
+        return FBoxSphereBounds{ LocalToWorld.GetLocation(), FVector{ Radii }, Radii };
+    case ESimpleVisualizerShape::HalfSphere:
+        return FBoxSphereBounds{ FVector{ 0.f, 0.f, Radii / 2.f }, 
+            FVector{ Radii, Radii, Radii / 2.f }, Radii }.TransformBy(LocalToWorld);
+    case ESimpleVisualizerShape::Box:
+        return FBoxSphereBounds{ FBox{ -Extent, Extent } }.TransformBy(LocalToWorld);
+    case ESimpleVisualizerShape::Cylinder:
+    case ESimpleVisualizerShape::Cone:
+    case ESimpleVisualizerShape::Capsule:
+    {
+        const float HalfHeight = Height / 2.f;
+        const FVector BoxExtent{ Radii, Radii, HalfHeight };
+        return FBoxSphereBounds(FVector::ZeroVector, BoxExtent, HalfHeight).TransformBy(LocalToWorld);
+    }
+    case ESimpleVisualizerShape::Points:
+    case ESimpleVisualizerShape::Polyline:
+    {
+        const FBoxSphereBounds PointsBounds{ Points.GetData(), static_cast<uint32>(Points.Num()) };
+        PointsBounds.ExpandBy(Radii).TransformBy(LocalToWorld);
+    }
+    }
+    return FBoxSphereBounds{ LocalToWorld.GetLocation(), FVector::ZeroVector, 0.f };
+}
+
+//
+// Setters
+//
+
+void USimpleVisualizerComponent::SetSphereShape(float InRadii)
+{
+    Shape = ESimpleVisualizerShape::Sphere;
+    Radii = InRadii;
+    UpdateBounds();
+    MarkRenderStateDirty();
+}
+
+void USimpleVisualizerComponent::SetHalfSphereShape(float InRadii)
+{
+    Shape = ESimpleVisualizerShape::HalfSphere;
+    Radii = InRadii;
+    UpdateBounds();
+    MarkRenderStateDirty();
+}
+
+void USimpleVisualizerComponent::SetBoxShape(const FVector& InExtent)
+{
+    Shape = ESimpleVisualizerShape::Box;
+    Extent = InExtent;
+    UpdateBounds();
+    MarkRenderStateDirty();
+}
+
+void USimpleVisualizerComponent::SetCylinderShape(float InRadii, float InHeight)
+{
+    Shape = ESimpleVisualizerShape::Cylinder;
+    Radii = InRadii;
+    Height = InHeight;
+    UpdateBounds();
+    MarkRenderStateDirty();
+}
+
+void USimpleVisualizerComponent::SetConeShape(float InRadii, float InHeight)
+{
+    Shape = ESimpleVisualizerShape::Cone;
+    Radii = InRadii;
+    Height = InHeight;
+    UpdateBounds();
+    MarkRenderStateDirty();
+}
+
+void USimpleVisualizerComponent::SetCapsuleShape(float InRadii, float InHeight)
+{
+    Shape = ESimpleVisualizerShape::Capsule;
+    Radii = InRadii;
+    Height = InHeight;
+    UpdateBounds();
+    MarkRenderStateDirty();
+}
+
+void USimpleVisualizerComponent::SetPointsShape(const TArray<FVector>& InPoints)
+{
+    Shape = ESimpleVisualizerShape::Points;
+    Points = InPoints;
+    UpdateBounds();
+    MarkRenderStateDirty();
+}
+
+void USimpleVisualizerComponent::SetPolylineShape(const TArray<FVector>& InPoints)
+{
+    Shape = ESimpleVisualizerShape::Polyline;
+    Points = InPoints;
+    UpdateBounds();
+    MarkRenderStateDirty();
+}
+
+void USimpleVisualizerComponent::SetColor(const FColor& InColor)
+{
+    Color = InColor;
+    MarkRenderStateDirty();
+}
+
+void USimpleVisualizerComponent::SetWireframe(bool InWireframe, float InLineThickness)
+{
+    Wireframe = InWireframe;
+    LineThickness = FMath::Max(0.f, InLineThickness);
+    MarkRenderStateDirty();
+}
+
+void USimpleVisualizerComponent::SetNumSides(int32 InNumSides)
+{
+    NumSides = FMath::Clamp(InNumSides, 8, 64);
+    MarkRenderStateDirty();
+}
