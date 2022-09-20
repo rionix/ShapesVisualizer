@@ -76,9 +76,7 @@ public:
 
     // UPrimitiveComponent Interface
 
-#if !UE_BUILD_SHIPPING
     virtual FPrimitiveSceneProxy* CreateSceneProxy() override;
-#endif
     virtual FBoxSphereBounds CalcBounds(const FTransform& LocalToWorld) const override;
 
 public:

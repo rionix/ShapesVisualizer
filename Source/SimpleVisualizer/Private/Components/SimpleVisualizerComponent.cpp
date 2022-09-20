@@ -1,6 +1,9 @@
 // Copyright (c) 2003-2022 Rionix, Ltd. All Rights Reserved.
 
 #include "Components/SimpleVisualizerComponent.h"
+#include "Engine/Engine.h"
+#include "Materials/Material.h"
+#include "PrimitiveSceneProxy.h"
 
 //
 // Internal functions
