@@ -1,26 +1,26 @@
-{
-	"FileVersion": 3,
-	"Version": 1,
-	"VersionName": "1.0",
-	"FriendlyName": "SimpleVisualizer",
-	"Description": "A component that can take various shapes to visualize debugging information.",
-	"Category": "Rendering",
-	"CreatedBy": "rionix",
-	"CreatedByURL": "https://rionix.github.io",
-	"DocsURL": "https://github.com/rionix/SimpleVisualizer/wiki",
-	"MarketplaceURL": "",
-	"SupportURL": "https://github.com/rionix/SimpleVisualizer/issues",
-	"CanContainContent": false,
-	"IsBetaVersion": false,
-	"IsExperimentalVersion": false,
-	"Installed": false,
-	"EngineVersion": "4.27.0",
-	"Modules": [
-		{
-			"Name": "SimpleVisualizer",
-			"Type": "Runtime",
-			"LoadingPhase": "Default",
-			"WhitelistPlatforms": [ "Win64", "Win32" ]
-		}
-	]
-}
+{ 
+	"FileVersion": 3, 
+	"Version": 1, 
+	"VersionName": "1.0", 
+	"FriendlyName": "Simple Visualizer", 
+	"Description": "This component allows you to visualize simple shapes: spheres, half spheres, boxes, cylinders, cones, capsules, points and polyline in wireframe and solid mode.", 
+	"Category": "Rendering", 
+	"CreatedBy": "rionix", 
+	"CreatedByURL": "https://rionix.github.io", 
+	"DocsURL": "https://github.com/rionix/SimpleVisualizer/wiki", 
+	"MarketplaceURL": "com.epicgames.launcher://ue/marketplace/product/379318dddcd6486aa26fc771df8c4b9a", 
+	"SupportURL": "https://github.com/rionix/SimpleVisualizer/issues", 
+	"CanContainContent": false, 
+	"IsBetaVersion": false, 
+	"IsExperimentalVersion": false, 
+	"Installed": false, 
+	"EngineVersion": "4.27.0", 
+	"Modules": [ 
+		{ 
+			"Name": "SimpleVisualizer", 
+			"Type": "Runtime", 
+			"LoadingPhase": "Default", 
+			"WhitelistPlatforms": [ "Win64" ] 
+		} 
+	] 
+} 

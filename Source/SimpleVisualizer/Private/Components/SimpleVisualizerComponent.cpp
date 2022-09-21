@@ -2,8 +2,10 @@
 
 #include "Components/SimpleVisualizerComponent.h"
 #include "Engine/Engine.h"
+#include "Engine/CollisionProfile.h"
 #include "Materials/Material.h"
 #include "PrimitiveSceneProxy.h"
+#include "Runtime/Launch/Resources/Version.h"
 
 //
 // Internal functions
@@ -64,6 +66,16 @@ namespace
 
             FDynamicMeshVertex MeshVertex;
 
+#if ENGINE_MAJOR_VERSION == 5
+            MeshVertex.Position = FVector3f(Vertex - TopOffset);
+            MeshVertex.TextureCoordinate[0] = FVector2f(TC);
+
+            MeshVertex.SetTangents(
+                (FVector3f)-ZAxis,
+                FVector3f((-ZAxis) ^ Normal),
+                (FVector3f)Normal
+            );
+#else
             MeshVertex.Position = Vertex - TopOffset;
             MeshVertex.TextureCoordinate[0] = TC;
 
@@ -72,6 +84,7 @@ namespace
                 (-ZAxis) ^ Normal,
                 Normal
             );
+#endif
 
             OutVerts.Add(MeshVertex); //Add bottom vertex
 
@@ -91,6 +104,16 @@ namespace
 
             FDynamicMeshVertex MeshVertex;
 
+#if ENGINE_MAJOR_VERSION == 5
+            MeshVertex.Position = FVector3f(Vertex + TopOffset);
+            MeshVertex.TextureCoordinate[0] = FVector2f(TC);
+
+            MeshVertex.SetTangents(
+                (FVector3f)-ZAxis,
+                FVector3f((-ZAxis) ^ Normal),
+                (FVector3f)Normal
+            );
+#else
             MeshVertex.Position = Vertex + TopOffset;
             MeshVertex.TextureCoordinate[0] = TC;
 
@@ -99,6 +122,7 @@ namespace
                 (-ZAxis) ^ Normal,
                 Normal
             );
+#endif
 
             OutVerts.Add(MeshVertex); //Add top vertex
 
