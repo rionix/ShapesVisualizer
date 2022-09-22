@@ -1,13 +1,13 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright (c) 2003-2022 rionix. All Rights Reserved.
 
 using UnrealBuildTool;
 
-public class SimpleVisualizer : ModuleRules
+public class ShapesVisualizer : ModuleRules
 {
-	public SimpleVisualizer(ReadOnlyTargetRules Target) : base(Target)
+	public ShapesVisualizer(ReadOnlyTargetRules Target) : base(Target)
 	{
 		PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
-		
+
 		PublicDependencyModuleNames.AddRange(new string[] { "Core" });
 		PrivateDependencyModuleNames.AddRange(new string[] { "CoreUObject", "RenderCore", "Engine" });
 	}

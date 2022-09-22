@@ -2,7 +2,7 @@
 
 REM --== Manual Config ==--
 
-SET PluginPureName=SimpleVisualizer
+SET PluginPureName=ShapesVisualizer
 SET Platforms=Win64
 
 REM --== Script Params ==--
