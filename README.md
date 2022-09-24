@@ -2,6 +2,10 @@
 
 This component can draw different shapes: spheres, half spheres, boxes, cylinders, cones, capsules, points and polyline in wireframe and solid mode. It is very convenient for displaying debugging information: target search areas, viewing angles, points of interest and others. You just add the component to the actor, select the shape, set its size, visibility settings and that's it. The shape and its parameters can be changed dynamically.
 
+## Marketplace URL:
+
+https://www.unrealengine.com/marketplace/en-US/product/379318dddcd6486aa26fc771df8c4b9a
+
 ## Features:
 
 * Simple :)
