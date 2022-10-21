@@ -3,7 +3,6 @@
 REM --== Manual Config ==--
 
 SET PluginPureName=ShapesVisualizer
-SET Platforms=Win64
 
 REM --== Script Params ==--
 
@@ -43,7 +42,6 @@ REM --== Build Plugin ==--
 
 CALL "%RunUAT%" BuildPlugin ^
 -Plugin="%PluginPath%" ^
--TargetPlatforms="%Platforms%" ^
 -Package="%PackagePath%" ^
 -Rocket -VS2019
 

@@ -20,7 +20,7 @@
 			"Name": "ShapesVisualizer",
 			"Type": "Runtime",
 			"LoadingPhase": "Default",
-			"WhitelistPlatforms": [ "Win64" ]
+			"WhitelistPlatforms": [ "Win64", "Android" ]
 		}
 	]
 }
