@@ -5,6 +5,7 @@
 #include "Engine/CollisionProfile.h"
 #include "Materials/Material.h"
 #include "PrimitiveSceneProxy.h"
+#include "DynamicMeshBuilder.h"
 #include "Runtime/Launch/Resources/Version.h"
 
 //
@@ -261,9 +262,11 @@ public:
                 false, IsIndividuallySelected());
             const FMaterialRenderProxy* const ParentMaterial = Wireframe ? nullptr
                 : GEngine->DebugMeshMaterial->GetRenderProxy();
-            const FMaterialRenderProxy* const MeshMaterial = ParentMaterial
-                ? new(FMemStack::Get()) FColoredMaterialRenderProxy(ParentMaterial, Color)
+            FMaterialRenderProxy* const MeshMaterial = ParentMaterial
+                ? new FColoredMaterialRenderProxy(ParentMaterial, Color)
                 : nullptr;
+            if (MeshMaterial)
+                Collector.RegisterOneFrameMaterialProxy(MeshMaterial);
 
             switch (Shape)
             {
