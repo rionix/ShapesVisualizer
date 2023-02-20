@@ -23,6 +23,6 @@ https://www.unrealengine.com/marketplace/en-US/product/379318dddcd6486aa26fc771d
 * Number of C++ Classes: **1**
 * Network Replicated: **No**
 * Supported Development Platforms: **Win64**
-* Supported Target Build Platforms: **Win64**
+* Supported Target Build Platforms: **Win64, Android**
 * Documentation: https://github.com/rionix/ShapesVisualizer/wiki
 * Support: https://github.com/rionix/ShapesVisualizer/issues
