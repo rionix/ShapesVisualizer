@@ -4,8 +4,10 @@
 #include "Engine/Engine.h"
 #include "Engine/CollisionProfile.h"
 #include "Materials/Material.h"
+#include "Materials/MaterialRenderProxy.h"
 #include "PrimitiveSceneProxy.h"
 #include "DynamicMeshBuilder.h"
+#include "SceneManagement.h"
 #include "Runtime/Launch/Resources/Version.h"
 
 //
